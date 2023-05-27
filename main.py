@@ -1,8 +1,8 @@
 import geopandas as gpd
-import tfAI
-import trimesh
+import open3d as o3d
+from lasTest import iterate_over_las
+import voxelize
 
 print('bruh')
 
-#shapefile = gpd.read_file("TreePoint/BronxP.shp")
-#print(shapefile)
+#iterate_over_las('initData.las', 10)
