@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+from voxelize import voxelize
 
 def iterate_over_las(las_file : str, square_length : int):
 
@@ -71,3 +72,12 @@ def iterate_over_las(las_file : str, square_length : int):
             ax.scatter(x_data, y_data, z_data)
             ax.set_axis_off()
             plt.show()
+
+            #voxelize
+            points = []
+            xmin = min(x_data)
+            ymin = min(y_data)
+            zmin = min(z_data)
+            for i in range(len(x_data)):
+                points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
+            voxelize(points, .25)

@@ -5,4 +5,4 @@ import voxelize
 
 print('bruh')
 
-#iterate_over_las('initData.las', 10)
+iterate_over_las('initData.las', 10)
