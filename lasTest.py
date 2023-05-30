@@ -78,6 +78,7 @@ def iterate_over_las(las_file : str, square_length : int):
     y_data = []
     z_data = []
     colors = []
+    voxel_grid_list = []
     for i in boxes:
         for j in i:
             #Clear the lists when moving to a new box
@@ -101,18 +102,18 @@ def iterate_over_las(las_file : str, square_length : int):
                 continue
             
             #Print the data of the current box
-            print('point count: ', len(x_data))
-            print('xmin: ', min(x_data), 'xmax: ', max(x_data), 'diff: ', max(x_data) - min(x_data))
-            print('ymin: ', min(y_data), 'ymax: ', max(y_data), 'diff: ', max(y_data) - min(y_data))
-            print('zmin: ', min(z_data), 'zmax: ', max(z_data), 'diff: ', max(z_data) - min(z_data))
+            # print('point count: ', len(x_data))
+            # print('xmin: ', min(x_data), 'xmax: ', max(x_data), 'diff: ', max(x_data) - min(x_data))
+            # print('ymin: ', min(y_data), 'ymax: ', max(y_data), 'diff: ', max(y_data) - min(y_data))
+            # print('zmin: ', min(z_data), 'zmax: ', max(z_data), 'diff: ', max(z_data) - min(z_data))
 
             if green:
-                #draw the points using matplotlib
-                fig = plt.figure(figsize=(5, 5))
-                ax = fig.add_subplot(111, projection="3d")
-                ax.scatter(x_data, y_data, z_data)
-                ax.set_axis_off()
-                plt.show()
+                # #draw the points using matplotlib
+                # fig = plt.figure(figsize=(5, 5))
+                # ax = fig.add_subplot(111, projection="3d")
+                # ax.scatter(x_data, y_data, z_data)
+                # ax.set_axis_off()
+                # plt.show()
 
                 #voxelize
                 points = []
@@ -121,4 +122,6 @@ def iterate_over_las(las_file : str, square_length : int):
                 zmin = min(z_data)
                 for i in range(len(x_data)):
                     points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
-                voxelize(points, colors, .25)
+                voxel_grid_list.append(voxelize(points, colors, .25, square_length))
+    
+    return voxel_grid_list
