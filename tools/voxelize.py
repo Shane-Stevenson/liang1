@@ -8,14 +8,10 @@ def voxelize(points : list, colors : list, voxel_size : int, bound : int):
     # Add the points, colors and normals as Vectors
     pcd.points = o3d.utility.Vector3dVector(points)
     pcd.colors = o3d.utility.Vector3dVector(colors)
-    #Create a voxel grid from the point cloud with a voxel_size of voxel_size and with a minimum bound of 0 and maximum bound of 10
-    mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
+    #Create a voxel grid from the point cloud with a voxel_size of voxel_size and with a minimum bound of 0 and maximum bound of bound
+    mins = np.array([0, 0, 0])      
     maxs = np.array([bound, bound, bound])
     voxel_grid=o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(pcd, voxel_size, mins, maxs)
-    # print(voxel_grid.get_max_bound())
-
-    visualize_voxel_grid(voxel_grid)
-    fill_voxel_grid(voxel_grid, .25, 10)
 
     return voxel_grid
 
@@ -49,9 +45,7 @@ def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : int, bound : int):
     maxs = np.array([bound, bound, bound])
     full_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(fullpcd, voxel_size, mins, maxs)
 
-    visualize_voxel_grid(full_voxel_grid)
-
-    return fullColors
+    return (full_voxel_grid, fullColors)
 
 def visualize_voxel_grid(voxel_grid : o3d.geometry.VoxelGrid):
     # for v in full_voxel_grid.get_voxels():

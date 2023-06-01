@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from tools.voxelize import voxelize
+from tools.voxelize import visualize_voxel_grid
 
-def iterate_over_las(las_file : str, square_length : int):
+def iterate_over_las(las_file : str, bound : int):
 
     #Load LiDAR data
     las = laspy.read(las_file)
@@ -39,12 +40,12 @@ def iterate_over_las(las_file : str, square_length : int):
 
     """
     The data is 1486 units long and 1758 units high. We place each point in its corresponding x-Box by dividing the difference of the 
-    point's x-position and the minimum x value by square_length. This process is repeated for the y value and then the point is appended
+    point's x-position and the minimum x value by bound. This process is repeated for the y value and then the point is appended
     to boxes
     """
     for i in point_data:
-        xIndex = math.floor((i[0] - XMIN)/square_length)
-        yIndex = math.floor((i[1] - YMIN)/square_length)
+        xIndex = math.floor((i[0] - XMIN)/bound)
+        yIndex = math.floor((i[1] - YMIN)/bound)
 
         #Add the points and colors to boxes
         match i[3]:
@@ -97,8 +98,7 @@ def iterate_over_las(las_file : str, square_length : int):
                     green = True
             
             #If there is no x or y data, or if the boxe's x or y length is short it means we are on an edge piece and we should skip
-            if(len(x_data) == 0 or len(y_data) == 0 or max(x_data) - min(x_data) < 8 or max(y_data) - min(y_data) < 8 
-               or max(z_data) - min(z_data) < 8):
+            if(len(x_data) == 0 or len(y_data) == 0 or max(x_data) - min(x_data) <  (bound - 2) or max(y_data) - min(y_data) < (bound - 2)):
                 continue
             
             #Print the data of the current box
@@ -122,7 +122,65 @@ def iterate_over_las(las_file : str, square_length : int):
                 zmin = min(z_data)
                 for i in range(len(x_data)):
                     points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
-                voxel_grid_list.append(voxelize(points, colors, .25, square_length))
+                voxel_grid_list.append(voxelize(points, colors, .25, bound))
 
     
     return voxel_grid_list
+
+def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float, las_file : str):
+    xmax = xmin + bound
+    ymax = ymin + bound
+    las = laspy.read(las_file)
+    #Recording the data in a numpy array
+    point_data = np.stack([las.x, las.y, las.z, las.classification], axis = 0).transpose((1,0))
+
+    x_data = []
+    y_data = []
+    z_data = []
+    colors = []
+    l = []
+    for i in point_data:
+        if i[0] > xmin and i[0] <  xmax and i[1] > ymin and i[1] < ymax:
+            if i[3] == 5:
+                l.append(i[2])
+            x_data.append(i[0])
+            y_data.append(i[1])
+            z_data.append(i[2])
+            match i[3]:
+                case 1:
+                    colors.append([0.416, 0.424, 0.471])
+                case 2:
+                    colors.append([0.541, 0.357, 0.173])
+                case 3:
+                    colors.append([0.329, 0.62, 0.8])
+                case 4: 
+                    colors.append([0.137, 0.922, 0.216])
+                case 5:
+                    colors.append([0.29, 0.69, 0.333])
+                case 6:
+                    colors.append([0.922, 0.149, 0.149])
+                case 7:
+                    colors.append([0.541, 0.145, 0.145])
+                case 8: 
+                    colors.append([0.165, 0.843, 0.878])
+                case 9:
+                    colors.append([0.898, 0.941, 0.192])
+                case 10:
+                    colors.append([0.337, 0.251, 0.749])
+                case 11:
+                    colors.append([0.282, 0.286, 0.322])
+                case 12: 
+                    colors.append([0.949, 0.314, 0.651])
+                case _:
+                    colors.append([0, 0, 0])
+    points = []
+    print(len(colors) == len(x_data))
+    zmin = min(z_data)
+    for i in range(len(x_data)):
+        points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
+    voxel = voxelize(points, colors, voxel_size, bound)
+
+    print(max(z_data) - min(z_data))
+    print(sum(l) / len(l))
+
+    return voxel
