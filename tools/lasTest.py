@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from voxelize import voxelize
+from tools.voxelize import voxelize
 
 def iterate_over_las(las_file : str, square_length : int):
 
@@ -123,5 +123,6 @@ def iterate_over_las(las_file : str, square_length : int):
                 for i in range(len(x_data)):
                     points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
                 voxel_grid_list.append(voxelize(points, colors, .25, square_length))
+
     
     return voxel_grid_list

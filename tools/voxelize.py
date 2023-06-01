@@ -14,6 +14,9 @@ def voxelize(points : list, colors : list, voxel_size : int, bound : int):
     voxel_grid=o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(pcd, voxel_size, mins, maxs)
     # print(voxel_grid.get_max_bound())
 
+    visualize_voxel_grid(voxel_grid)
+    fill_voxel_grid(voxel_grid, .25, 10)
+
     return voxel_grid
 
 
@@ -45,6 +48,8 @@ def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : int, bound : int):
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
     maxs = np.array([bound, bound, bound])
     full_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(fullpcd, voxel_size, mins, maxs)
+
+    visualize_voxel_grid(full_voxel_grid)
 
     return fullColors
 
