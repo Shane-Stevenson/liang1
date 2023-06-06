@@ -2,6 +2,9 @@ import open3d as o3d
 import numpy as np
 
 def voxelize(points : list, colors : list, voxel_size : int, bound : int):
+    """
+    Given a list of points and colors, a voxel grid is created
+    """
     # Initialize a point cloud object
     pcd = o3d.geometry.PointCloud()
 
@@ -16,7 +19,11 @@ def voxelize(points : list, colors : list, voxel_size : int, bound : int):
     return voxel_grid
 
 
-def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : int, bound : int):
+def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : float, bound : int): #check?????
+    """
+    Given a voxel grid, this function creates a new voxel grid where every voxel in the original grid is marked as gray (on), and
+    every other voxel is marked as black (off). This is to create uniformity in the data for easier AI processing
+    """
     #make new pointcloud and then a new voxelGrid
     fullPoints = []
     fullColors = []
@@ -48,6 +55,9 @@ def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : int, bound : int):
     return (full_voxel_grid, fullColors)
 
 def visualize_voxel_grid(voxel_grid : o3d.geometry.VoxelGrid):
+    """
+    This function accepts a voxel grid and visualizes it using open3D
+    """
     # for v in full_voxel_grid.get_voxels():
     #     print(v.grid_index)
     print('min: ', voxel_grid.get_min_bound())

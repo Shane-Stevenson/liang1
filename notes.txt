@@ -1,0 +1,9 @@
+sliding window data augmentation??
+
+semi-supervised learning
+
+semi-supervised validation (data it hasn't seen)
+
+shift towards model that counts trees (data??)
+
+actual segmentation??

@@ -3,10 +3,15 @@ import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from tools.voxelize import voxelize
-from tools.voxelize import visualize_voxel_grid
+from tools.voxelization import voxelize
+from tools.voxelization import visualize_voxel_grid
 
-def iterate_over_las(las_file : str, bound : int):
+def iterate_over_las(las_file : str, bound : int, voxel_size : float):
+
+    """
+    This function iterates through a .las file and returns a tuple consisting of a list of voxel grids, as well as a
+    parallel list containing each voxel grid's x, y maximums and minimums
+    """
 
     #Load LiDAR data
     las = laspy.read(las_file)
@@ -16,13 +21,14 @@ def iterate_over_las(las_file : str, bound : int):
     point_data = np.stack([las.x, las.y, las.z, las.classification], axis = 0).transpose((1,0))
     print(point_data)
 
-
-    XMIN = 671790.69
-    XMAX = 673277.34
-    YMIN = 3677052.9 
-    YMAX = 3678811.21
+    XMIN = las.header.mins[0]
+    XMAX = las.header.maxs[0]
+    YMIN = las.header.mins[1]
+    YMAX = las.header.maxs[1]
         
     print('looping...')
+
+    #222 and 262 are arbitrary numbers that should be changed based on the las file
 
     #initialize a 222x262 2D array for the points
     boxes = []
@@ -38,11 +44,6 @@ def iterate_over_las(las_file : str, bound : int):
         for j in range(262):
             colors[i].append([])
 
-    """
-    The data is 1486 units long and 1758 units high. We place each point in its corresponding x-Box by dividing the difference of the 
-    point's x-position and the minimum x value by bound. This process is repeated for the y value and then the point is appended
-    to boxes
-    """
     for i in point_data:
         xIndex = math.floor((i[0] - XMIN)/bound)
         yIndex = math.floor((i[1] - YMIN)/bound)
@@ -80,14 +81,18 @@ def iterate_over_las(las_file : str, bound : int):
     z_data = []
     colors = []
     voxel_grid_list = []
+    xy = []
+    count = 0
     for i in boxes:
+        count += 1
+        if count == 20:
+            break
         for j in i:
             #Clear the lists when moving to a new box
             x_data.clear()
             y_data.clear()
             z_data.clear()
             colors.clear()
-            green = False
             for k in j:
                 #fill the lists with all the values in the current box
                 x_data.append(k[0])
@@ -101,33 +106,39 @@ def iterate_over_las(las_file : str, bound : int):
             if(len(x_data) == 0 or len(y_data) == 0 or max(x_data) - min(x_data) <  (bound - 2) or max(y_data) - min(y_data) < (bound - 2)):
                 continue
             
-            #Print the data of the current box
+            # Print the data of the current box
             # print('point count: ', len(x_data))
             # print('xmin: ', min(x_data), 'xmax: ', max(x_data), 'diff: ', max(x_data) - min(x_data))
             # print('ymin: ', min(y_data), 'ymax: ', max(y_data), 'diff: ', max(y_data) - min(y_data))
             # print('zmin: ', min(z_data), 'zmax: ', max(z_data), 'diff: ', max(z_data) - min(z_data))
 
-            if green:
-                # #draw the points using matplotlib
-                # fig = plt.figure(figsize=(5, 5))
-                # ax = fig.add_subplot(111, projection="3d")
-                # ax.scatter(x_data, y_data, z_data)
-                # ax.set_axis_off()
-                # plt.show()
+            
+            # #draw the points using matplotlib
+            # fig = plt.figure(figsize=(5, 5))
+            # ax = fig.add_subplot(111, projection="3d")
+            # ax.scatter(x_data, y_data, z_data)
+            # ax.set_axis_off()
+            # plt.show()
 
-                #voxelize
-                points = []
-                xmin = min(x_data)
-                ymin = min(y_data)
-                zmin = min(z_data)
-                for i in range(len(x_data)):
-                    points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
-                voxel_grid_list.append(voxelize(points, colors, .25, bound))
+            #voxelize
+            points = []
+            xmin = min(x_data)
+            ymin = min(y_data)
+            zmin = min(z_data)
+            for i in range(len(x_data)):
+                points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
+
+            xy.append([min(x_data), min(y_data), max(x_data), max(y_data)])
+            voxel_grid_list.append(voxelize(points, colors, voxel_size, bound))
 
     
-    return voxel_grid_list
+    return (voxel_grid_list, xy)
 
 def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float, las_file : str):
+    """
+    Given a x and y coordinate, a voxel grid is constructed of size bound x bound x bound whose origin is xmin and ymin.
+    The voxel grid is returned
+    """
     xmax = xmin + bound
     ymax = ymin + bound
     las = laspy.read(las_file)
@@ -173,14 +184,11 @@ def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float,
                     colors.append([0.949, 0.314, 0.651])
                 case _:
                     colors.append([0, 0, 0])
+
     points = []
-    print(len(colors) == len(x_data))
     zmin = min(z_data)
     for i in range(len(x_data)):
         points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
     voxel = voxelize(points, colors, voxel_size, bound)
-
-    print(max(z_data) - min(z_data))
-    print(sum(l) / len(l))
 
     return voxel

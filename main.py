@@ -1,16 +1,12 @@
 import geopandas as gpd
 import open3d as o3d
-import tools.lasTest as lasTest
-import tools.voxelize as voxelization
-import tools.data as data
+import tools.lasTools as lasTools
+import tools.voxelization as voxelization
+import tools.dataTools as dataTools
 import AI.ai1 as ai1
+import AI.ai2 as ai2
+import random
+import json
+import csv
 
-print('bruh')
 
-v = lasTest.get_voxelization(671813.03, 3677706.3299999996, 25, 1, 'data/initData.las')
-
-voxelization.visualize_voxel_grid(v)
-
-full = voxelization.fill_voxel_grid(v, 1, 25)
-
-voxelization.visualize_voxel_grid(full[0])

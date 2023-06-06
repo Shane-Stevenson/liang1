@@ -12,30 +12,30 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 import torchvision
 from torchvision import transforms, datasets
+import tools.dataTools as aaa
+import tools.voxelization as voxelization
 
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(64000, 128) #First layer must be equal to the amount of voxels in a filled grid
+        self.fc1 = nn.Linear(8000, 128) #First layer must be equal to the amount of voxels in a filled grid
         self.fc2 = nn.Linear(128, 128)
-        """self.fc3 = nn.Linear(64, 128)
-        self.fc4 = nn.Linear(128, 256)
-        self.fc5 = nn.Linear(256, 128)
-        self.fc6 = nn.Linear(128, 64)"""
-        self.fc7 = nn.Linear(128, 64)
-        self.fc8 = nn.Linear(64, 16)
-        self.fc9 = nn.Linear(16, 2)
+        self.fc3 = nn.Linear(128, 256)
+        self.fc4 = nn.Linear(256, 128)
+        self.fc5 = nn.Linear(128, 64)
+        self.fc6 = nn.Linear(64, 32)
+        self.fc7 = nn.Linear(32, 16)
+        self.fc8 = nn.Linear(16, 3)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        """x = F.relu(self.fc3(x))
+        x = F.relu(self.fc3(x))
         x = F.relu(self.fc4(x))
         x = F.relu(self.fc5(x))
-        x = F.relu(self.fc6(x))"""
+        x = F.relu(self.fc6(x))
         x = F.relu(self.fc7(x))
-        x = F.relu(self.fc8(x))
-        x = self.fc9(x)
+        x = self.fc8(x)
 
         return F.softmax(x, dim = -1)
     
@@ -63,7 +63,7 @@ def trainAndTest(data : str):
     print(tensor_test)
 
     #separate data set into training and testing
-    x_train, x_test, y_train, y_test = train_test_split(tensor_train, tensor_test, test_size=.20, shuffle= True, random_state= 2195)
+    x_train, x_test, y_train, y_test = train_test_split(tensor_train, tensor_test, test_size=.2, shuffle=False)
     x_train = x_train.type(torch.FloatTensor)
     x_test = x_test.type(torch.FloatTensor)
     y_train = y_train.type(torch.FloatTensor)
@@ -73,8 +73,8 @@ def trainAndTest(data : str):
 
     net = Net()
 
-    optimizer = optim.AdamW(net.parameters(), lr = .0003)
-    EPOCHS = 5
+    optimizer = optim.Adam(net.parameters(), lr = .00003)
+    EPOCHS = 6
 
     step = 0
 
@@ -84,9 +84,11 @@ def trainAndTest(data : str):
         for j in range(x_train.shape[0]):
             i = random[j]
             if y_train[i] == 0:
-                y = torch.tensor([1., 0.])
+                y = torch.tensor([1., 0., 0.])
+            elif y_train[i] == 1:
+                y = torch.tensor([0., 1., 0.])
             else:
-                y = torch.tensor([0.,1.])
+                y = torch.tensor([0., 0., 1.])
             output = net(x_train[i])
             loss = F.binary_cross_entropy(output, y) 
             writer.add_scalar("loss/train", loss, step)
@@ -98,46 +100,65 @@ def trainAndTest(data : str):
 
     step = 0
     correct = 0
-    isTree = False
-    aiSaysTree = False
-    falsePositive = 0
-    falseNegative = 0
+    label = 0
+    aiResult = 0
+
+    AInoTree = 0
+    AItree = 0
+    AImultipleTree = 0
+
+    noTree = 0
+    tree = 0
+    multipleTree = 0
+
+
     total = 0
 
     #test
     random = torch.randperm(x_test.shape[0])
     with torch.no_grad():
         for j in range(x_test.shape[0]):
+
             i = random[j]
-            if y_test[i] == 0:
-                isTree = False
-            else:
-                isTree = True
+            label = y_test[i]
 
             output = net(x_test[i])
             loss = F.binary_cross_entropy(output, y)
             writer.add_scalar("loss/test", loss, step)
             step += 1
 
-            if output[0] > output[1]:
-                aiSaysTree = False
+            if max(output[0], output[1], output[2]) == output[0]:
+                aiResult = 0
+                AInoTree += 1
+            elif max(output[0], output[1], output[2]) == output[1]:
+                aiResult = 1
+                AItree += 1
             else:
-                aiSaysTree = True
+                aiResult = 2
+                AImultipleTree += 1
+
+            if label == 0:
+                noTree += 1
+            elif label == 1:
+                tree += 1
+            else:
+                multipleTree += 1
 
             #output[0] > output[1] represents the AI saying it is not a tree
-            if isTree and aiSaysTree:
-                correct += 1
-            if not isTree and not aiSaysTree:
+            if label == aiResult:
                 correct+=1
-            
-            if isTree and not aiSaysTree:
-                falseNegative += 1
-            if not isTree and aiSaysTree:
-                falsePositive += 1
+                print('right: ', output, '(label = ', label, ')')
+            else:
+                # v = aaa.csv_to_voxel(x_test[i].tolist(), 20, 1)[0]
+                # print('output: ', aiResult)
+                # print('label: ', label)
+                # voxelization.visualize_voxel_grid(v)
+                print('wrong: ', output, '(label = ', label, ')')
 
             total += 1
         print(loss)
     
     print("Accuracy: ", correct/total)
-    print('falseNegative: ', falseNegative)
-    print('falsePositive: ', falsePositive)
+    print('no tree: ', AInoTree, ' : ', noTree)
+    print('tree: ', AItree, ' : ',tree)
+    print('multiple tree: ', AImultipleTree, ' : ',multipleTree)
