@@ -23,9 +23,10 @@ def voxel_to_csv(out_location : str, colors : list, label : int):
         row.append(label) # 0 represents no tree, 1 represents 1 tree, 2 represents multiple trees
         writer.writerow(row)
 
-def csv_to_voxel(voxel_in_csv_format : list, bound : int, voxel_size : float):
+def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_size : float):
     """
-    recieves a 1D array representation of a voxel and constructs an o3d.VoxelGrid object from the given array
+    recieves a 1D array representation of a voxel and constructs an o3d.VoxelGrid object from the given array.
+    Returns a tuple containing the voxel, and its label
     """
     x = 0
     y = 0
@@ -36,10 +37,10 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, voxel_size : float):
 
     for i in range(len(voxel_in_csv_format)):
         if int(voxel_in_csv_format[i]) == 1:
-            points.append([x, y, z])
+                points.append([x, y, z])
         
         z += voxel_size
-        if z >= bound/voxel_size:
+        if z >= height/voxel_size:
             y += voxel_size
             z = 0
         
@@ -51,7 +52,7 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, voxel_size : float):
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
-    maxs = np.array([bound, bound, bound])
+    maxs = np.array([bound, bound, height])
     voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return (voxel_grid, label)
@@ -119,33 +120,22 @@ def defineData(las_data : str, voxel_bounds : int, voxel_size : float, csv_file 
     print(len(v))
     d = dict()
     
+    total = 0
     for i in range(len(v)):
         print(xy[i])
         voxelization.visualize_voxel_grid(v[i])
-        usr = input("Does this grid contain no trees, one tree, or multiple trees? (n/y/m)")
-        if usr == 'n':
-            colors = voxelization.fill_voxel_grid(v[i], voxel_size, voxel_bounds)[1]
-            voxel_to_csv(csv_file, colors, 0)
-            colors.append(0)
-            d[str(xy[i])] = colors
-        elif usr == 'y':
-            colors = voxelization.fill_voxel_grid(v[i], voxel_size, voxel_bounds)[1]
-            voxel_to_csv(csv_file, colors, 1)
-            colors.append(1)
-            d[str(xy[i])] = colors
-        elif usr == 'm':
-            colors = voxelization.fill_voxel_grid(v[i], voxel_size, voxel_bounds)[1]
-            voxel_to_csv(csv_file, colors, 2)
-            colors.append(2)
-            d[str(xy[i])] = colors
-        elif usr == 'quit':
+        usr = input("How many trees does this voxel grid contain?")
+        if usr == 'quit':
             break
         elif usr == 'u':
             continue
         else:
-            continue
+            colors = voxelization.fill_voxel_grid(v[i], voxel_size, voxel_bounds)[1]
+            voxel_to_csv(csv_file, colors, usr)
+        total += 1
+        print(total)
 
-def affine_augment_csv_file(in_file : str, out_file : str, bound : int, voxel_size : float):
+def affine_augment_csv_file(in_file : str, out_file : str, bound : int, height : int, voxel_size : float):
     """
     This function recieves a csv file of voxel grids, (created by voxel_to_csv()) and generates 7 new voxel grids by rotating the 
     original one 90 degrees 4 times, and then mirroring it and rotating it again 3 times.
@@ -155,21 +145,21 @@ def affine_augment_csv_file(in_file : str, out_file : str, bound : int, voxel_si
     csv_voxel_grid = list(csvreader)
 
     for i in csv_voxel_grid:
-        tuple = csv_to_voxel(i, bound, voxel_size)
+        tuple = csv_to_voxel(i, bound, height, voxel_size)
         voxel = tuple[0]
         label = tuple[1]
         for j in range(4):
-            full = voxelization.fill_voxel_grid(voxel, voxel_size, bound)[1]
+            full = voxelization.fill_voxel_grid(voxel, bound, height, voxel_size)[1]
             voxel_to_csv(out_file, full, label)
-            voxel = rotate_90(voxel, bound, voxel_size)
+            voxel = rotate_90(voxel, bound, height, voxel_size)
         
-        voxel = mirror(voxel, 20, 1)
+        voxel = mirror(voxel, bound, height, voxel_size)
         for j in range(4):
-            full = voxelization.fill_voxel_grid(voxel, voxel_size, bound)[1]
+            full = voxelization.fill_voxel_grid(voxel, bound, height, voxel_size)[1]
             voxel_to_csv(out_file, full, label)
-            voxel = rotate_90(voxel, bound, voxel_size)
+            voxel = rotate_90(voxel, bound, height, voxel_size)
     
-def random_augment_csv(in_file : str, out_file : str, bound : int, voxel_size : float, percent : int, iterations : int):
+def random_augment_csv(in_file : str, out_file : str, bound : int, height : int, voxel_size : float, thousandths : int, iterations : int):
     """
     This function recieves a csv file of voxel grids, (created by voxel_to_csv()) and generates n new voxel grids by 
     randomly selecting voxels adjacent to those already on, and randomly turning them on or off (depending on their current state)
@@ -179,18 +169,18 @@ def random_augment_csv(in_file : str, out_file : str, bound : int, voxel_size : 
     csv_voxel_grid = list(csvreader)
 
     for i in csv_voxel_grid:
-        tuple = csv_to_voxel(i, bound, voxel_size)
+        tuple = csv_to_voxel(i, bound, height, voxel_size)
         voxel = tuple[0]
         label = tuple[1]
-        full = voxelization.fill_voxel_grid(voxel, voxel_size, bound)[1]
+        full = voxelization.fill_voxel_grid(voxel, bound, height, voxel_size)[1]
         voxel_to_csv(out_file, full, label)
         for j in range(iterations):
-            vnew = generate_new_data(voxel, bound, voxel_size, percent)
-            full = voxelization.fill_voxel_grid(voxel, voxel_size, bound)[1]
+            vnew = generate_new_data(voxel, bound, height, voxel_size, thousandths)
+            full = voxelization.fill_voxel_grid(vnew, bound, height, voxel_size)[1]
             voxel_to_csv(out_file, full, label)
 
 
-def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
+def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
     zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
@@ -198,13 +188,13 @@ def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
     xyz = []
     for x in range(int(bound/voxel_size)):
         for y in range(int(bound/voxel_size)):
-            for z in range(int(bound/voxel_size)):
+            for z in range(int(height/voxel_size)):
                 xyz.append([x*voxel_size, y*voxel_size, z*voxel_size])
     
     bools = v.check_if_included(o3d.utility.Vector3dVector(xyz))
     
     zxy = []
-    for i in range(int(bound/voxel_size)):
+    for i in range(int(height/voxel_size)):
         zxy.append([])
         for j in range(int(bound/voxel_size)):
             zxy[i].append([])
@@ -217,19 +207,18 @@ def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
 
     return zxy
 
-def rotate_90(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
+def rotate_90(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and rotates it 90 degrees, and then returns the new rotated voxel grid
     """
-    zxy = voxel_to_zyx(v, bound, voxel_size)
-        
+    zxy = voxel_to_zyx(v, bound, height, voxel_size)
     #rotate zxy
     for i in range(len(zxy)):
         rotated = list(reversed(list(zip(*zxy[i]))))
         zxy[i] = rotated
     
     points = []
-    for z in range(int(bound/voxel_size)):
+    for z in range(int(height/voxel_size)):
         for x in range(int(bound/voxel_size)):
             for y in range(int(bound/voxel_size)):
                 if zxy[z][x][y] == 1:
@@ -238,16 +227,16 @@ def rotate_90(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
-    maxs = np.array([bound, bound, bound])
+    maxs = np.array([bound, bound, height])
     rotated_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return rotated_voxel_grid
 
-def mirror(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
+def mirror(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recives a voxel grid, mirrors it across the x axis (I think), and returns the new voxel grid 
     """
-    zxy = voxel_to_zyx(v, bound, voxel_size)
+    zxy = voxel_to_zyx(v, bound, height, voxel_size)
         
     #rotate zxy
     for i in range(len(zxy)):
@@ -255,7 +244,7 @@ def mirror(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
         zxy[i] = mirrored
     
     points = []
-    for z in range(int(bound/voxel_size)):
+    for z in range(int(height/voxel_size)):
         for x in range(int(bound/voxel_size)):
             for y in range(int(bound/voxel_size)):
                 if zxy[z][x][y] == 1:
@@ -264,22 +253,22 @@ def mirror(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float):
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
-    maxs = np.array([bound, bound, bound])
+    maxs = np.array([bound, bound, height])
     rotated_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return rotated_voxel_grid
 
-def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : float, percent : int):
+def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float, percent : int):
     """
     This function recieves a voxel grid and injects noise into it by randomly selecting voxels adjacent to given voxels
     that are already on, and turns adjacent ones on or off respective of their current state. The new voxel grid is then
     returned
     """
-    zxy = voxel_to_zyx(v, bound, voxel_size)
+    zxy = voxel_to_zyx(v, bound, height, voxel_size)
     points = []
     
     count = 0
-    for i in range(int(bound/voxel_size)):
+    for i in range(int(height/voxel_size)):
         for j in range(int(bound/voxel_size)):
             for k in range(int(bound/voxel_size)):
                 if i <= 3:
@@ -299,15 +288,15 @@ def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : floa
 
     for i in points:
         for j in manipulations:
-            if random.randint(0,100) < percent:
-                if i[0]+j[0] < bound and i[1]+j[1] < bound and i[2]+j[2] < bound:
+            if random.randint(0,1000) < percent:
+                if i[0]+j[0] < height and i[0]+j[0] >= 0 and i[1]+j[1] < bound and  i[1]+j[1] < bound >= 0 and i[2]+j[2] < bound and i[2]+j[2] >= 0:
                     if zxy[i[0]+j[0]][i[1]+j[1]][i[2]+j[2]] == 0:
                         zxy[i[0]+j[0]][i[1]+j[1]][i[2]+j[2]] = 1
                     else:
                         zxy[i[0]+j[0]][i[1]+j[1]][i[2]+j[2]] = 0
 
     points = []
-    for z in range(int(bound/voxel_size)):
+    for z in range(int(height/voxel_size)):
         for x in range(int(bound/voxel_size)):
             for y in range(int(bound/voxel_size)):
                 if zxy[z][x][y] == 1:
@@ -316,15 +305,51 @@ def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, voxel_size : floa
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
-    maxs = np.array([bound, bound, bound])
+    maxs = np.array([bound, bound, height])
     rotated_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return rotated_voxel_grid
 
                 
-        
+def ceiling_on_csv(in_file : str, out_file : str, bound : int, height : int, voxel_size : float):
+    """
+    This function accepts a csv file containing voxels, and places a ceiling on each voxel and ouputs the new voxels in another
+    location
+    """
+    file = open(in_file)
+    csvreader = csv.reader(file)
+    csv_voxel_grid = list(csvreader)
 
+    for i in csv_voxel_grid:
+        if len(i) == 0:
+            continue
+        x = 0
+        y = 0
+        z = 0
+        points = []
+        #Remove the label and store it
+        label = i.pop()
+
+        for j in range(len(i)):
+            if int(i[j]) == 1:
+                if z < height/voxel_size:
+                    points.append([x, y, z])
             
-
+            z += voxel_size
+            if z >= bound/voxel_size:
+                y += voxel_size
+                z = 0
+            
+            if y >= bound/voxel_size:
+                x += voxel_size
+                y = 0
+            
+        #Create a point cloud and then initialize a VoxelGrid
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(points)
+        mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
+        maxs = np.array([bound, bound, height])
+        voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
         
-
+        c = voxelization.fill_voxel_grid(voxel_grid, bound, height, voxel_size)[1]
+        voxel_to_csv(out_file, c, label)

@@ -12,34 +12,24 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 import torchvision
 from torchvision import transforms, datasets
-import tools.dataTools as aaa
-import tools.voxelization as voxelization
 
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(8000, 1024) #First layer must be equal to the amount of voxels in a filled grid
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 256)
-        self.fc4 = nn.Linear(256, 128)
-        self.fc5 = nn.Linear(128, 64)
-        self.fc6 = nn.Linear(64, 32)
-        self.fc7 = nn.Linear(32, 16)
-        self.fc8 = nn.Linear(16, 3)
+        self.fc1 = nn.Linear(30*30*20, 2048) #First layer must be equal to the amount of voxels in a filled grid
+        self.fc2 = nn.Linear(2048, 256)
+        self.fc3 = nn.Linear(256, 32)
+        self.fc4 = nn.Linear(32, 7)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        x = F.relu(self.fc4(x))
-        x = F.relu(self.fc5(x))
-        x = F.relu(self.fc6(x))
-        x = F.relu(self.fc7(x))
-        x = self.fc8(x)
+        x = self.fc4(x)
 
         return F.softmax(x, dim = -1)
     
-    def train(self, data : str):
+    def train(self, data : str, epochs : int):
         # open and read data
         writer = SummaryWriter()
         csvreader = csv.reader(open(data))
@@ -68,12 +58,10 @@ class Net(nn.Module):
         x_train = x_train.type(torch.FloatTensor)
         y_train = y_train.type(torch.FloatTensor)
 
-        batchSize = 8
-
         net = self
 
         optimizer = optim.Adam(net.parameters(), lr = .00003)
-        EPOCHS = 6
+        EPOCHS = epochs
 
         step = 0
 
@@ -82,12 +70,11 @@ class Net(nn.Module):
             random = torch.randperm(x_train.shape[0])
             for j in range(x_train.shape[0]):
                 i = random[j]
-                if y_train[i] == 0:
-                    y = torch.tensor([1., 0., 0.])
-                elif y_train[i] == 1:
-                    y = torch.tensor([0., 1., 0.])
-                else:
-                    y = torch.tensor([0., 0., 1.])
+                y = torch.tensor([0., 0., 0., 0., 0., 0., 0.])
+                index = 0
+                for k in range(int(y_train[i])):
+                    index+=1
+                y[index] = 1.
                 output = net(x_train[i])
                 loss = F.binary_cross_entropy(output, y) 
                 writer.add_scalar("loss/train", loss, step)
@@ -133,14 +120,8 @@ class Net(nn.Module):
         label = 0
         aiResult = 0
 
-        AInoTree = 0
-        AItree = 0
-        AImultipleTree = 0
-
-        noTree = 0
-        tree = 0
-        multipleTree = 0
-
+        aiCount = 0
+        actual = 0
 
         total = 0
 
@@ -153,29 +134,32 @@ class Net(nn.Module):
                 label = y_test[i]
 
                 output = net(x_test[i])
-                # loss = F.binary_cross_entropy(output, label)
-                # writer.add_scalar("loss/test", loss, step)
                 step += 1
 
-                if max(output[0], output[1], output[2]) == output[0]:
-                    aiResult = 0
-                    AInoTree += 1
-                elif max(output[0], output[1], output[2]) == output[1]:
-                    aiResult = 1
-                    AItree += 1
-                else:
-                    aiResult = 2
-                    AImultipleTree += 1
 
-                if label == 0:
-                    noTree += 1
-                elif label == 1:
-                    tree += 1
+                m = max(output)
+                index = 0
+                for k in range(7):
+                    if output[k] == m:
+                        aiResult = k
+                        break
+                    index+=1
+
+                # print('ai: ', aiResult)
+                # print('label: ', label)
+
+                if aiResult == label:
+                    correct += 1
                 else:
-                    multipleTree += 1
+                    print(output, ' : ', aiResult, '->', label)
                 total += 1
+
+                aiCount += aiResult
+                actual += label
+
+
         
-        print('no trees : ', AInoTree)
-        print('tree : ', AItree)
-        print('multiple trees : ', AImultipleTree)
-        print('count = ', AItree + (AImultipleTree * 2))
+        print('acc: ', correct/total)
+        print('count acc: ', aiCount/actual.item())
+        print('ai: ', aiCount)
+        print('actual: ', actual.item())

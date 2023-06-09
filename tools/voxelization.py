@@ -19,7 +19,7 @@ def voxelize(points : list, colors : list, voxel_size : int, bound : int):
     return voxel_grid
 
 
-def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : float, bound : int): #check?????
+def fill_voxel_grid(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float): #check?????
     """
     Given a voxel grid, this function creates a new voxel grid where every voxel in the original grid is marked as gray (on), and
     every other voxel is marked as black (off). This is to create uniformity in the data for easier AI processing
@@ -30,13 +30,14 @@ def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : float, bound : int)
     xyz = []
     for x in range(int(bound/voxel_size)):
         for y in range(int(bound/voxel_size)):
-            for z in range(int(bound/voxel_size)):
+            for z in range(int(height/voxel_size)):
                 xyz.append([x*voxel_size, y*voxel_size, z*voxel_size])
-
+    
     #If the voxel exists in the one we created from the original point cloud, color it and add it to the new voxel grid
     #If the voxel does not exist in the original voxel grid, color it black and add it to the new voxel grid
     #The colors is how the AI will distinguish voxels that represent points and voxels that represent empty space
     bools = v.check_if_included(o3d.utility.Vector3dVector(xyz))
+
     for i in range(len(bools)):
         if(bools[i]):
             fullPoints.append(xyz[i])
@@ -49,7 +50,7 @@ def fill_voxel_grid(v : o3d.geometry.VoxelGrid, voxel_size : float, bound : int)
     fullpcd.points = o3d.utility.Vector3dVector(fullPoints)
     fullpcd.colors = o3d.utility.Vector3dVector(fullColors)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
-    maxs = np.array([bound, bound, bound])
+    maxs = np.array([bound, bound, height])
     full_voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(fullpcd, voxel_size, mins, maxs)
 
     return (full_voxel_grid, fullColors)
