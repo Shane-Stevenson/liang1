@@ -16,8 +16,8 @@ from torchvision import transforms, datasets
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(30*30*20, 2048) #First layer must be equal to the amount of voxels in a filled grid
-        self.fc2 = nn.Linear(2048, 256)
+        self.fc1 = nn.Linear(30*30*20, 1024) #First layer must be equal to the amount of voxels in a filled grid
+        self.fc2 = nn.Linear(1024, 256)
         self.fc3 = nn.Linear(256, 32)
         self.fc4 = nn.Linear(32, 7)
 
@@ -43,6 +43,7 @@ class Net(nn.Module):
 
         #create test list for output comparation
         test = []
+
         for x in range(len(train)):
             test.append(train[x][len(train[x])-1])
             train[x].pop(len(train[x])-1) #pop the output off the train data
@@ -150,16 +151,16 @@ class Net(nn.Module):
 
                 if aiResult == label:
                     correct += 1
-                else:
-                    print(output, ' : ', aiResult, '->', label)
+                # else:
+                #     print(output, ' : ', aiResult, '->', label)
+                print(aiResult, '->', label)
                 total += 1
 
                 aiCount += aiResult
                 actual += label
 
 
-        
-        print('acc: ', correct/total)
-        print('count acc: ', aiCount/actual.item())
         print('ai: ', aiCount)
-        print('actual: ', actual.item())
+        if actual != 0:
+            print('actual: ', actual)
+            print('ai/actual: ', aiCount/actual )

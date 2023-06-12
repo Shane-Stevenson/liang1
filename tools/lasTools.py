@@ -21,32 +21,33 @@ def iterate_over_las(las_file : str, bound : int, voxel_size : float):
     point_data = np.stack([las.x, las.y, las.z, las.classification], axis = 0).transpose((1,0))
     print(point_data)
 
-    XMIN = las.header.mins[0]
-    XMAX = las.header.maxs[0]
-    YMIN = las.header.mins[1]
-    YMAX = las.header.maxs[1]
-        
+    XMIN = 671821.2000000001
+    XMAX = 673308.23
+    YMIN = 3675320.3000000003
+    YMAX = 3677078.63
+
     print('looping...')
 
-    #222 and 262 are arbitrary numbers that should be changed based on the las file
 
-    #initialize a 222x262 2D array for the points
     boxes = []
-    for i in range(222):
+    for i in range(int((XMAX-XMIN)/bound + 1)):
         boxes.append([])
-        for j in range(262):
+        for j in range(int((YMAX-YMIN)/bound + 1)):
             boxes[i].append([])
+    
+    print(len(boxes[0]))
 
     #initialize a 222x262 2D array for the colors
     colors = []
-    for i in range(222):
+    for i in range(int((XMAX-XMIN)/bound + 1)):
         colors.append([])
-        for j in range(262):
+        for j in range(int((YMAX-YMIN)/bound + 1)):
             colors[i].append([])
 
     for i in point_data:
         xIndex = math.floor((i[0] - XMIN)/bound)
         yIndex = math.floor((i[1] - YMIN)/bound)
+
 
         #Add the points and colors to boxes
         match i[3]:
@@ -85,8 +86,6 @@ def iterate_over_las(las_file : str, bound : int, voxel_size : float):
     count = 0
     for i in boxes:
         count += 1
-        if count == 20:
-            break
         for j in i:
             #Clear the lists when moving to a new box
             x_data.clear()
@@ -190,5 +189,68 @@ def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float,
     for i in range(len(x_data)):
         points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
     voxel = voxelize(points, colors, voxel_size, bound)
+
+    return voxel
+
+def get_voxelization_heat(xmin : float, ymin: float, bound : int, voxel_size : float, las_file : str):
+    xmax = xmin + bound
+    ymax = ymin + bound
+    las = laspy.read(las_file)
+    #Recording the data in a numpy array
+    point_data = np.stack([las.x, las.y, las.z, las.classification], axis = 0).transpose((1,0))
+
+    x_data = []
+    y_data = []
+    z_data = []
+    classes = []
+    colors = []
+    for i in point_data:
+        if i[0] > xmin and i[0] <  xmax and i[1] > ymin and i[1] < ymax:
+            x_data.append(i[0])
+            y_data.append(i[1])
+            z_data.append(i[2])
+            classes.append(i[3])
+    xarr = np.array(x_data)
+    yarr = np.array(y_data)
+    zarr = np.array(z_data)
+    carr = np.array(classes)
+    #Associate x_data and y_data lists with z_data, then sort the all of them in descending z_data order
+    idx = np.flip(np.argsort(zarr))
+    xarr = np.array(xarr)[idx]
+    yarr = np.array(yarr)[idx]
+    zarr = np.array(zarr)[idx]
+    carr = np.array(carr)[idx]
+
+    red=0
+    green=0
+    blue=0
+
+    rscale=2.5
+    gscale=0
+    bscale=0.5
+
+    for i in range(len(z_data)):
+        #Modify how the gradient changes here
+        if red + (1/len(z_data)) < 0.95: # Don't want white voxels
+            red = red + (1/len(z_data)) * rscale
+        if green + (1/len(z_data)) < 0.95:
+            green = green + (1/len(z_data)) * gscale
+        if blue + (1/len(z_data)) < 0.95:
+            blue = blue + (1/len(z_data)) * bscale
+        if carr[i] == 6 or carr[i] == 2:
+            colors.append([0.95, 0.95, 0.95])
+        else:
+            colors.append([red, green, blue])
+        rscale = rscale + 0.00025 # 0.0025, 0.00075
+        gscale = gscale + 0.000125 # 0.00125, 0.000125
+        bscale = bscale + 0.0200 # 0.0125, 0.02
+    points = []
+    #print(len(colors) == len(x_data))
+    zmin = min(z_data)
+    for i in range(len(x_data)):
+        points.append([xarr[i] - xmin, yarr[i] - ymin, zarr[i] - zmin])
+    voxel = voxelize(points, colors, voxel_size, bound)
+
+    #print(max(z_data) - min(z_data))
 
     return voxel
