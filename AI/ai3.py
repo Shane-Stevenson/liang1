@@ -16,16 +16,22 @@ from torchvision import transforms, datasets
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(30*30*20, 1024) #First layer must be equal to the amount of voxels in a filled grid
-        self.fc2 = nn.Linear(1024, 256)
-        self.fc3 = nn.Linear(256, 32)
-        self.fc4 = nn.Linear(32, 7)
+        self.fc1 = nn.Linear(30*30*20, 4096) #First layer must be equal to the amount of voxels in a filled grid
+        self.fc2 = nn.Linear(4096, 2048)
+        self.fc3 = nn.Linear(2048, 1024)
+        self.fc4 = nn.Linear(1024, 512)
+        self.fc5 = nn.Linear(512, 256)
+        self.fc6 = nn.Linear(256, 128)
+        self.fc7 = nn.Linear(128, 7)
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        x = self.fc4(x)
+        x = F.relu(self.fc4(x))
+        x = F.relu(self.fc5(x))
+        x = F.relu(self.fc6(x))
+        x = self.fc7(x)
 
         return F.softmax(x, dim = -1)
     
@@ -164,3 +170,4 @@ class Net(nn.Module):
         if actual != 0:
             print('actual: ', actual)
             print('ai/actual: ', aiCount/actual )
+        

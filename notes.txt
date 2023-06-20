@@ -7,3 +7,18 @@ semi-supervised validation (data it hasn't seen)
 shift towards model that counts trees (data??)
 
 actual segmentation??
+
+
+Methods:
+
+Voxelization : In order to transform the pointcloud data into a more usable format for deep learning, we used a process called
+voxelization. Essentially, the pointcloud is transposed onto a 3D grid, and a voxel (or 3D unit within the grid) is either
+turned off or on dependent on whether or not a point falls within the voxel or not. This process allowed for easier
+visualization, but mainly to uniformize the data for deep learning.
+
+Data augmentation : We found early on that hand-labeling data ourselves for testing and validation was both slow and innacurate.
+Data augmentation allowed us to speed up this process by taking one piece of labeled data and turning it into several. We used 
+affine transformations like rotating and mirroring voxel grids in order to turn one datapoint into 8. Additionally, we 
+injected noise into our data for even further data generation
+
+Autoencoding : In order to allow for our AI to learn segmentation, we wanted a reduced form 

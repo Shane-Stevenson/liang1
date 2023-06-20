@@ -1,10 +1,13 @@
 import laspy
+import fiona
+import geopandas as gpd
 import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from tools.voxelization import voxelize
-from tools.voxelization import visualize_voxel_grid
+import tools.voxelization as voxelization
+import tools.dataTools as dt
+import random
 
 def iterate_over_las(las_file : str, bound : int, voxel_size : float):
 
@@ -128,7 +131,7 @@ def iterate_over_las(las_file : str, bound : int, voxel_size : float):
                 points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
 
             xy.append([min(x_data), min(y_data), max(x_data), max(y_data)])
-            voxel_grid_list.append(voxelize(points, colors, voxel_size, bound))
+            voxel_grid_list.append(voxelization.voxelize(points, colors, voxel_size, bound))
 
     
     return (voxel_grid_list, xy)
@@ -188,7 +191,7 @@ def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float,
     zmin = min(z_data)
     for i in range(len(x_data)):
         points.append([x_data[i] - xmin, y_data[i] - ymin, z_data[i] - zmin])
-    voxel = voxelize(points, colors, voxel_size, bound)
+    voxel = voxelization.voxelize(points, colors, voxel_size, bound)
 
     return voxel
 
@@ -249,8 +252,31 @@ def get_voxelization_heat(xmin : float, ymin: float, bound : int, voxel_size : f
     zmin = min(z_data)
     for i in range(len(x_data)):
         points.append([xarr[i] - xmin, yarr[i] - ymin, zarr[i] - zmin])
-    voxel = voxelize(points, colors, voxel_size, bound)
+    voxel = voxelization.voxelize(points, colors, voxel_size, bound)
 
     #print(max(z_data) - min(z_data))
 
     return voxel
+
+def iterate_over_las_with_bounds(in_file : str, out_file : str, xmin : float, ymin : float, xmax : float, ymax : float):
+    """
+    function will utilize iterate_over_las() and use boundries to section off a part of a .las file.
+    The user is then prompted to label each voxel grid. The grids are then saved to out_file in csv format.
+    """
+    count = 0
+    (voxels, xy) = iterate_over_las(in_file, 30, 1)
+
+    zipped = list(zip(voxels, xy))
+    random.shuffle(zipped)
+    voxels, xy = zip(*zipped)
+    print(len(voxels))
+    for i in range(len(xy)):
+        if xy[i][0] >  xmin and xy[i][2] < xmax and xy[i][1] > ymin and xy[i][3] < ymax:
+            print("(", xy[i][0], ", ", xy[i][1], "), (", xy[i][2], ", ", xy[i][3], ")")
+            voxelization.visualize_voxel_grid(voxels[i])
+            usr = input('How many trees are contained in that voxel grid?')
+            if usr == 'u' :
+                continue
+            c = voxelization.fill_voxel_grid(voxels[i], 30, 20, 1)[1]
+            dt.voxel_to_csv(out_file, c, usr)
+            print(i, "/", len(voxels))

@@ -32,12 +32,14 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_si
     y = 0
     z = 0
     points = []
+    colors = []
     #Remove the label and store it
     label = voxel_in_csv_format.pop()
 
     for i in range(len(voxel_in_csv_format)):
         if int(voxel_in_csv_format[i]) == 1:
                 points.append([x, y, z])
+                colors.append([.9-z/height, .9-z/height, .9-z/height])
         
         z += voxel_size
         if z >= height/voxel_size:
@@ -51,6 +53,7 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_si
     #Create a point cloud and then initialize a VoxelGrid
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points)
+    point_cloud.colors = o3d.utility.Vector3dVector(colors)
     mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
     maxs = np.array([bound, bound, height])
     voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
@@ -207,6 +210,33 @@ def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_si
 
     return zxy
 
+def voxel_to_zyx4D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
+    """
+    This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
+    zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
+    """
+    xyz = []
+    for x in range(int(bound/voxel_size)):
+        for y in range(int(bound/voxel_size)):
+            for z in range(int(height/voxel_size)):
+                xyz.append([x*voxel_size, y*voxel_size, z*voxel_size])
+    
+    bools = v.check_if_included(o3d.utility.Vector3dVector(xyz))
+    
+    zxy = []
+    for i in range(int(height/voxel_size)):
+        zxy.append([])
+        for j in range(int(bound/voxel_size)):
+            zxy[i].append([])
+            for k in range(int(bound/voxel_size)):
+                zxy[i][j].append([0])
+
+    for i in range(len(bools)):
+        if bools[i]:
+            zxy[xyz[i][2]][xyz[i][0]][xyz[i][1]] = [1]
+
+    return zxy
+
 def rotate_90(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and rotates it 90 degrees, and then returns the new rotated voxel grid
@@ -353,3 +383,17 @@ def ceiling_on_csv(in_file : str, out_file : str, bound : int, height : int, vox
         
         c = voxelization.fill_voxel_grid(voxel_grid, bound, height, voxel_size)[1]
         voxel_to_csv(out_file, c, label)
+
+def merge_csv_files(files : list, out_location : str):
+    """
+    This function recieves a list of strings of file locations and merges the csv files into one file.
+    """
+    merge = open(out_location, 'w')
+    writer = csv.writer(merge)
+
+    for i in files:
+        file = open(i)
+        reader = csv.reader(file)
+        voxels = list(reader)
+        for j in voxels:
+            writer.writerow(j)
