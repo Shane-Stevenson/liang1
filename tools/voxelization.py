@@ -76,3 +76,26 @@ def visualize_voxel_grid(voxel_grid : o3d.geometry.VoxelGrid):
     vis.run()
     # Once the visualizer is closed destroy the window and clean up
     vis.destroy_window()
+
+def screen_capture_voxel_grid(voxel_grid : o3d.geometry.VoxelGrid, filename : str):
+    """
+    This function accepts a voxel grid and visualizes it using open3D
+    """
+    # for v in full_voxel_grid.get_voxels():
+    #     print(v.grid_index)
+    print('min: ', voxel_grid.get_min_bound())
+    print('max: ', voxel_grid.get_max_bound())
+
+    # Initialize a visualizer object
+    vis = o3d.visualization.Visualizer()
+    # Create a window, name it and scale it
+    vis.create_window(window_name='Open 3D visualizer', width=800, height=600)
+
+    # Add the voxel grid to the visualizer
+    vis.add_geometry(voxel_grid)
+
+    # run the visualizater
+    # vis.run()
+    vis.capture_screen_image(filename, True)
+    # Once the visualizer is closed destroy the window and clean up
+    vis.destroy_window()

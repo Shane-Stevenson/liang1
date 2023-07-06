@@ -1,5 +1,6 @@
 import laspy
 import fiona
+import csv
 import geopandas as gpd
 import math
 import matplotlib.pyplot as plt
@@ -196,6 +197,11 @@ def get_voxelization(xmin : float, ymin: float, bound : int, voxel_size : float,
     return voxel
 
 def get_voxelization_heat(xmin : float, ymin: float, bound : int, voxel_size : float, las_file : str):
+    """
+    Given a x and y coordinate, a voxel grid is constructed of size bound x bound x bound whose origin is xmin and ymin.
+    Each voxel will be colored according ot its height making the voxel easier to see.
+    The voxel grid is returned
+    """
     xmax = xmin + bound
     ymax = ymin + bound
     las = laspy.read(las_file)
@@ -258,7 +264,7 @@ def get_voxelization_heat(xmin : float, ymin: float, bound : int, voxel_size : f
 
     return voxel
 
-def iterate_over_las_with_bounds(in_file : str, out_file : str, xmin : float, ymin : float, xmax : float, ymax : float):
+def iterate_over_las_with_bounds(in_file : str, out_file : str, xmin : float, ymin : float, xmax : float, ymax : float, bound : int, voxel_size : float):
     """
     function will utilize iterate_over_las() and use boundries to section off a part of a .las file.
     The user is then prompted to label each voxel grid. The grids are then saved to out_file in csv format.
@@ -280,3 +286,139 @@ def iterate_over_las_with_bounds(in_file : str, out_file : str, xmin : float, ym
             c = voxelization.fill_voxel_grid(voxels[i], 30, 20, 1)[1]
             dt.voxel_to_csv(out_file, c, usr)
             print(i, "/", len(voxels))
+
+def iterate_over_las_with_shp(las_file : str, shp_file : str, out_file : str, xmin : float, ymin : float, xmax : float, ymax : float, bound : int, height : int, voxel_size : float):
+    
+    """
+    Given a .las file and a .shp file this function iterates over the las file and writes voxel grids to a csv labeled with the number of .shp points
+    each the voxel grid. Used to get labeled data for a regression AI
+    """
+
+    (voxels, xy) = iterate_over_las(las_file, bound, voxel_size)
+
+    voxels_in_bounds = []
+
+    m = 0
+    total = 0
+    iter = 1
+    
+    for i in range(len(xy)):
+        if xy[i][0] >  xmin and xy[i][2] < xmax and xy[i][1] > ymin and xy[i][3] < ymax:
+            iter += 1
+            print("(", xy[i][0], ", ", xy[i][1], "), (", xy[i][2], ", ", xy[i][3], ")")
+            voxels_in_bounds.append(voxels[i])
+            count = 0
+            for feat in fiona.open(shp_file):
+                if feat['properties']['xcoord'] > xy[i][0] and feat['properties']['xcoord'] < xy[i][2] and feat['properties']['ycoord'] > xy[i][1] and feat['properties']['ycoord'] < xy[i][3]:
+                    count += 1
+            if count > m:
+                m = count
+            total += count
+            if count <= 7:
+                c = voxelization.fill_voxel_grid(voxels[i], bound, height, voxel_size)[1]
+                dt.voxel_to_csv(out_file, c, count)
+
+def segment_over_las_with_shp(las_file : str, shp_file : str, out_file : str, xmin : float, ymin : float, xmax : float, ymax : float, bound : int, height : int, voxel_size : float):
+
+    """
+    Given a .las file and a .shp file this function iterates over the las file and writes voxel grids to a csv file labeled with their corresponding
+    bounding boxes gathered from the .shp file. Used for getting labeled data for segmentation
+    """
+
+    (voxels, xy) = iterate_over_las(las_file, bound, voxel_size)
+
+    voxels_in_bounds = []
+
+    writer = csv.writer(open(out_file, 'w'))
+
+    #Create a dictionary containing shapefile points paired with their id's
+    shpDict = dict()
+    for feat in fiona.open(shp_file):
+        shpDict[feat['properties']['id']] = feat
+
+    #Iterate over the list of voxel grids
+    for i in range(len(xy)):
+        if xy[i][0] >  xmin and xy[i][2] < xmax and xy[i][1] > ymin and xy[i][3] < ymax:
+            # print("(", xy[i][0], ", ", xy[i][1], "), (", xy[i][2], ", ", xy[i][3], ")")
+            voxels_in_bounds.append(voxels[i])
+
+            smallDict = dict()
+
+            #Add points within this grid to a dictionary
+            for j in shpDict:
+                if (shpDict[j]['properties']['xcoord'] > xy[i][0] and shpDict[j]['properties']['xcoord'] < xy[i][2] and 
+                    shpDict[j]['properties']['ycoord'] > xy[i][1] and shpDict[j]['properties']['ycoord'] < xy[i][3]):
+                    smallDict[j] = (shpDict[j]['properties']['xcoord'], shpDict[j]['properties']['ycoord'])
+
+            newPoints = []
+            idxs = []
+            for j in smallDict:
+                tempTuple = (0, 0)
+                if j % 2 == 1:
+                    if j+1 not in smallDict:
+                        if shpDict[j+1]['properties']['xcoord'] > xmin and shpDict[j+1]['properties']['xcoord'] < xmax:
+                            tempTuple = (shpDict[j+1]['properties']['xcoord'], tempTuple[1])
+                        else:
+                            tempTuple = (xy[i][2], tempTuple[1])
+                        
+                        if shpDict[j+1]['properties']['ycoord'] > ymin and shpDict[j+1]['properties']['ycoord'] < ymax:
+                            tempTuple = (tempTuple[0], shpDict[j+1]['properties']['ycoord'])
+                        else:
+                            tempTuple = (tempTuple[0], xy[i][3])
+                        newPoints.append(tempTuple)
+                        idxs.append(j+1)
+                else:
+                    if j-1 not in smallDict:
+                        if shpDict[j-1]['properties']['xcoord'] > xmin and shpDict[j-1]['properties']['xcoord'] < xmax:
+                            tempTuple = (shpDict[j-1]['properties']['xcoord'], tempTuple[1])
+                        else:
+                            tempTuple = (xy[i][0], tempTuple[1])
+                        
+                        if shpDict[j-1]['properties']['ycoord'] > ymin and shpDict[j-1]['properties']['ycoord'] < ymax:
+                            tempTuple = (tempTuple[0], shpDict[j-1]['properties']['ycoord'])
+                        else:
+                            tempTuple = (tempTuple[0], xy[i][1])
+                        newPoints.append(tempTuple)
+                        idxs.append(j-1)
+
+
+
+            for j in range(len(newPoints)):
+                smallDict[idxs[j]] = newPoints[j]
+            idxs = []
+            for j in smallDict:
+                idxs.append(j)
+            idxs.sort()
+            print(idxs)
+            boundingCoord = []
+            for j in idxs:
+                boundingCoord.append((max(0, min(bound-1, int(smallDict[j][0] - xy[i][0]))), max(0, min(bound-1, int(smallDict[j][1] - xy[i][1])))))
+            
+            j = len(boundingCoord) - 1
+            while j >= 0:
+                if j % 2 == 0:
+                    print(len(boundingCoord))
+                    print(j)
+                    if ((boundingCoord[j+1][0]-boundingCoord[j][0]) * (boundingCoord[j+1][1] - boundingCoord[j][1]) < 8):
+                        boundingCoord.pop(j+1)
+                        boundingCoord.pop(j)
+                j-=1
+
+            print(xy[i])
+            print(boundingCoord)
+            colors = voxelization.fill_voxel_grid(voxels[i], bound, height, voxel_size)[1]
+            row = []
+            for i in colors:
+                if i[0] == 0:
+                    row.append(0)
+                else:
+                    row.append(1)
+
+            # v2 = dt.create_bounding_box(row, boundingCoord, bound, height, voxel_size)
+            # voxelization.visualize_voxel_grid(v2)
+
+            for j in boundingCoord:
+                row.append(j)
+            writer.writerow(row)
+
+            #Finally add the points to the voxel in csv form and write

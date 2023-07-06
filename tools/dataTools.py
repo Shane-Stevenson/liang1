@@ -183,7 +183,7 @@ def random_augment_csv(in_file : str, out_file : str, bound : int, height : int,
             voxel_to_csv(out_file, full, label)
 
 
-def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
+def voxel_to_zxy(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
     zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
@@ -210,7 +210,7 @@ def voxel_to_zyx(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_si
 
     return zxy
 
-def voxel_to_zyx4D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
+def voxel_to_zxy4D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
     zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
@@ -241,7 +241,7 @@ def rotate_90(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size 
     """
     This function recieves a voxel grid and rotates it 90 degrees, and then returns the new rotated voxel grid
     """
-    zxy = voxel_to_zyx(v, bound, height, voxel_size)
+    zxy = voxel_to_zxy(v, bound, height, voxel_size)
     #rotate zxy
     for i in range(len(zxy)):
         rotated = list(reversed(list(zip(*zxy[i]))))
@@ -266,7 +266,7 @@ def mirror(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : f
     """
     This function recives a voxel grid, mirrors it across the x axis (I think), and returns the new voxel grid 
     """
-    zxy = voxel_to_zyx(v, bound, height, voxel_size)
+    zxy = voxel_to_zxy(v, bound, height, voxel_size)
         
     #rotate zxy
     for i in range(len(zxy)):
@@ -294,7 +294,7 @@ def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, height : int, vox
     that are already on, and turns adjacent ones on or off respective of their current state. The new voxel grid is then
     returned
     """
-    zxy = voxel_to_zyx(v, bound, height, voxel_size)
+    zxy = voxel_to_zxy(v, bound, height, voxel_size)
     points = []
     
     count = 0
@@ -397,3 +397,77 @@ def merge_csv_files(files : list, out_location : str):
         voxels = list(reader)
         for j in voxels:
             writer.writerow(j)
+
+def create_bounding_box(voxel_in_csv_format : list, coords : list, bound : int, height : int, voxel_size : float):
+    """
+    This function recieves a voxel in csv format as well as a list of coordinates (bounding boxes) and creates a new voxel grid where the 
+    boudning boxes are visualized. This is used for easy data visualization
+    """
+    x = 0
+    y = 0
+    z = 0
+    points = []
+    colors = []
+
+    for i in range(len(voxel_in_csv_format)):
+        temp = False
+        for j in coords:
+            if x == j[0] and y == j[1]:
+                temp = True
+                break
+        if int(voxel_in_csv_format[i]) == 1 or (temp):
+                points.append([x, y, z])
+                colors.append([.9-z/height, .9-z/height, .9-z/height])
+        
+        z += voxel_size
+        if z >= height/voxel_size:
+            y += voxel_size
+            z = 0
+        
+        if y >= bound/voxel_size:
+            x += voxel_size
+            y = 0
+
+    #Create a point cloud and then initialize a VoxelGrid
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(points)
+    point_cloud.colors = o3d.utility.Vector3dVector(colors)
+    mins = np.array([0, 0, 0])      #min and max could be changed to function arguments for more manuverability
+    maxs = np.array([bound, bound, height])
+    voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
+
+    return voxel_grid
+
+
+
+def fill_voxel_boundary_boxes(in_file : str, out_file : str, padding : int):
+    """
+    Once segment_over_las_with_shp is ran, the various voxel grids in the csv file will have a varying amount of bounding boxes. This function
+    iterates through the csv file and creates a new csv file where each voxel grid has the same size label. Voxels with a non-maximum amount
+    of bounding boxes have their label's extra space filled with zeroes to represent no bounding box.
+
+    This is used to create uniform data so that a segmentation AI can use this preprocessed data
+    """
+    reader = csv.reader(open(in_file))
+    vs = list(reader)
+    m = 0
+    for i in vs:
+        count = 0
+        idx = len(i)-1
+        while type(eval(i[idx])) == tuple:
+            count += 1
+            idx -= 1
+        m = max(count, m)
+
+    writer = csv.writer(open(out_file, 'w'))
+    for i in vs:
+        count = 0
+        idx = len(i)-1
+        while type(eval(i[idx])) == tuple:
+            count += 1
+            idx -= 1
+        iter = 0
+        while iter < m - count:
+            i.append((0,0))
+            iter += 1
+        writer.writerow(i)

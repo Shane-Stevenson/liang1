@@ -3,3 +3,6 @@ open3d
 laspy
 matplotlib
 numpy
+fiona
+torchvision
+sklearn

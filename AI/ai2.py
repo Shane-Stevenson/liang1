@@ -1,7 +1,3 @@
-from calendar import EPOCH
-from cgi import test
-import enum
-import itertools
 import csv
 import torch
 import torch.nn as nn
@@ -9,11 +5,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.model_selection import train_test_split
-import torchvision
-from torchvision import transforms, datasets
-import tools.dataTools as aaa
-import tools.voxelization as voxelization
 
 class Net(nn.Module):
     def __init__(self):
