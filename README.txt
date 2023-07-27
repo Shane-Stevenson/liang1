@@ -5,6 +5,6 @@ as heavily documented as the tools.
 Installation:
 
     1. git clone https://github.com/Shane-Stevenson/liang1.git
-    2. conda create -n 'replace with desire name' python=3.10
+    2. conda create -n 'replace with desired name' python=3.10
     3. cd liang1
     4. pip install -r requirements.txt
