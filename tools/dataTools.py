@@ -3,6 +3,7 @@ import random
 import numpy as np
 import tools.voxelization as voxelization
 import json
+import math
 import tools.lasTools as lasTools
 import csv
 
@@ -22,6 +23,17 @@ def voxel_to_csv(out_location : str, colors : list, label : int):
 
         row.append(label) # 0 represents no tree, 1 represents 1 tree, 2 represents multiple trees
         writer.writerow(row)
+    
+def voxel_to_1D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : int):
+    c = voxelization.fill_voxel_grid(v, bound, height, voxel_size)[1]
+    l = []
+    for i in c:
+        if i[0] == 0:
+            l.append(0)
+        else:
+            l.append(1)
+        
+    return l
 
 def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_size : float):
     """
@@ -42,11 +54,11 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_si
                 colors.append([.9-z/height, .9-z/height, .9-z/height])
         
         z += voxel_size
-        if z >= height/voxel_size:
+        if z >= height:
             y += voxel_size
             z = 0
         
-        if y >= bound/voxel_size:
+        if y >= bound:
             x += voxel_size
             y = 0
         
@@ -59,7 +71,6 @@ def csv_to_voxel(voxel_in_csv_format : list, bound : int, height : int, voxel_si
     voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return (voxel_grid, label)
-
 
 def createTrainingData(positive_csv : str, negative_csv : str, out_location, count : int):
     """
@@ -107,37 +118,6 @@ def createTrainingData(positive_csv : str, negative_csv : str, out_location, cou
                 for i in random.sample(range(0, negative), count):
                     writer.writerow(lossList[i])
 
-
-def defineData(las_data : str, voxel_bounds : int, voxel_size : float, csv_file : str):
-    """
-    This function calls lasTools.iterate_over_las to get a list of VoxelGrid's. This list is then iterated over and at each grid 
-    the user is prompted to state whether the given voxel grid has no trees, one tree, or multiple trees.
-    """
-    tuple = lasTools.iterate_over_las(las_data, voxel_bounds, voxel_size)
-    v = tuple[0]
-    voxelization.fill_voxel_grid(v[0], 1, 20)
-    xy = tuple[1]
-    c = list(zip(v, xy))
-    random.shuffle(c)
-    v, xy = zip(*c)
-    print(len(v))
-    d = dict()
-    
-    total = 0
-    for i in range(len(v)):
-        print(xy[i])
-        voxelization.visualize_voxel_grid(v[i])
-        usr = input("How many trees does this voxel grid contain?")
-        if usr == 'quit':
-            break
-        elif usr == 'u':
-            continue
-        else:
-            colors = voxelization.fill_voxel_grid(v[i], voxel_size, voxel_bounds)[1]
-            voxel_to_csv(csv_file, colors, usr)
-        total += 1
-        print(total)
-
 def affine_augment_csv_file(in_file : str, out_file : str, bound : int, height : int, voxel_size : float):
     """
     This function recieves a csv file of voxel grids, (created by voxel_to_csv()) and generates 7 new voxel grids by rotating the 
@@ -182,20 +162,26 @@ def random_augment_csv(in_file : str, out_file : str, bound : int, height : int,
             full = voxelization.fill_voxel_grid(vnew, bound, height, voxel_size)[1]
             voxel_to_csv(out_file, full, label)
 
-
 def voxel_to_zxy(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
     zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
     """
     xyz = []
-    for x in range(int(bound/voxel_size)):
-        for y in range(int(bound/voxel_size)):
-            for z in range(int(height/voxel_size)):
-                xyz.append([x*voxel_size, y*voxel_size, z*voxel_size])
-    
+    z=0
+    x=0
+    y=0
+    for i in range(int(bound*bound*height/(voxel_size**3))):
+        xyz.append([x, y, z])  
+        z += voxel_size
+        if z >= height:
+            y += voxel_size
+            z = 0
+        
+        if y >= bound:
+            x += voxel_size
+            y = 0
     bools = v.check_if_included(o3d.utility.Vector3dVector(xyz))
-    
     zxy = []
     for i in range(int(height/voxel_size)):
         zxy.append([])
@@ -206,20 +192,32 @@ def voxel_to_zxy(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_si
 
     for i in range(len(bools)):
         if bools[i]:
-            zxy[xyz[i][2]][xyz[i][0]][xyz[i][1]] = 1
+            zxy[int(xyz[i][2]/voxel_size)][int(xyz[i][0]/voxel_size)][int(xyz[i][1]/voxel_size)] = 1
 
     return zxy
 
 def voxel_to_zxy4D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel grid and returns a 3 dimensional array whose indices are z,x,y. Thus, calling 
-    zyx[2][0][3] returns a one or zero at z=3, x=1, y=4 depending on whether on not that voxel is turned on
+    zyx[2][0][3] returns a [0] or [1] at z=3, x=1, y=4 depending on whether on not that voxel is turned on.
+
+    This function returns a 4D list because pyTorch's 3dConv function requires a specific input shape that is 
+    not satisfied with the original voxel_to_zxy() function
     """
     xyz = []
-    for x in range(int(bound/voxel_size)):
-        for y in range(int(bound/voxel_size)):
-            for z in range(int(height/voxel_size)):
-                xyz.append([x*voxel_size, y*voxel_size, z*voxel_size])
+    z=0
+    x=0
+    y=0
+    for i in range(int(bound*bound*height/(voxel_size**3))):
+        xyz.append([x, y, z])  
+        z += voxel_size
+        if z >= height:
+            y += voxel_size
+            z = 0
+        
+        if y >= bound:
+            x += voxel_size
+            y = 0
     
     bools = v.check_if_included(o3d.utility.Vector3dVector(xyz))
     
@@ -233,7 +231,7 @@ def voxel_to_zxy4D(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_
 
     for i in range(len(bools)):
         if bools[i]:
-            zxy[xyz[i][2]][xyz[i][0]][xyz[i][1]] = [1]
+            zxy[int(xyz[i][2]/voxel_size)][int(xyz[i][0]/voxel_size)][int(xyz[i][1]/voxel_size)] = [1]
 
     return zxy
 
@@ -268,7 +266,7 @@ def mirror(v : o3d.geometry.VoxelGrid, bound : int, height : int, voxel_size : f
     """
     zxy = voxel_to_zxy(v, bound, height, voxel_size)
         
-    #rotate zxy
+    #mirror zxy
     for i in range(len(zxy)):
         mirrored = list(reversed(zxy[i]))
         zxy[i] = mirrored
@@ -340,7 +338,29 @@ def generate_new_data(v : o3d.geometry.VoxelGrid, bound : int, height : int, vox
 
     return rotated_voxel_grid
 
-                
+def split_csv_file(in_file : str, train_file : str, test_file : str, train_ratio : float):
+    """
+    This function will split one file into two with sizes determined by train_ration.
+    Used to create a train set and a validation set
+    """
+    reader = csv.reader(open(in_file))
+    vals = list(reader)
+    switchVal = math.ceil(len(vals) * train_ratio)
+    writer1 = csv.writer(open(train_file, 'w'))
+    writer2 = csv.writer(open(test_file, 'w'))
+    idx = 0
+    while idx < switchVal:
+        writer1.writerow(vals[idx])
+        idx+=1
+    
+    while idx % 8 != 0:
+        writer1.writerow(vals[idx])
+        idx+=1
+    
+    while idx < len(vals):
+        writer2.writerow(vals[idx])
+        idx+=1
+           
 def ceiling_on_csv(in_file : str, out_file : str, bound : int, height : int, voxel_size : float):
     """
     This function accepts a csv file containing voxels, and places a ceiling on each voxel and ouputs the new voxels in another
@@ -401,7 +421,9 @@ def merge_csv_files(files : list, out_location : str):
 def create_bounding_box(voxel_in_csv_format : list, coords : list, bound : int, height : int, voxel_size : float):
     """
     This function recieves a voxel in csv format as well as a list of coordinates (bounding boxes) and creates a new voxel grid where the 
-    boudning boxes are visualized. This is used for easy data visualization
+    bounding boxes are visualized. This is used for easy data visualization
+
+    coords = list N,4
     """
     x = 0
     y = 0
@@ -409,22 +431,23 @@ def create_bounding_box(voxel_in_csv_format : list, coords : list, bound : int, 
     points = []
     colors = []
 
+    print(coords)
     for i in range(len(voxel_in_csv_format)):
         temp = False
         for j in coords:
-            if x == j[0] and y == j[1]:
+            if x == j[0] and y == j[1] or x == j[2] and y == j[3]:
                 temp = True
                 break
         if int(voxel_in_csv_format[i]) == 1 or (temp):
-                points.append([x, y, z])
-                colors.append([.9-z/height, .9-z/height, .9-z/height])
+            points.append([x, y, z])
+            colors.append([.9-z/height, .9-z/height, .9-z/height])
         
         z += voxel_size
-        if z >= height/voxel_size:
+        if z >= height:
             y += voxel_size
             z = 0
         
-        if y >= bound/voxel_size:
+        if y >= bound:
             x += voxel_size
             y = 0
 
@@ -437,8 +460,6 @@ def create_bounding_box(voxel_in_csv_format : list, coords : list, bound : int, 
     voxel_grid = o3d.geometry.VoxelGrid.create_from_point_cloud_within_bounds(point_cloud, voxel_size, mins, maxs)
 
     return voxel_grid
-
-
 
 def fill_voxel_boundary_boxes(in_file : str, out_file : str, padding : int):
     """
@@ -458,7 +479,7 @@ def fill_voxel_boundary_boxes(in_file : str, out_file : str, padding : int):
             count += 1
             idx -= 1
         m = max(count, m)
-
+    print(m)
     writer = csv.writer(open(out_file, 'w'))
     for i in vs:
         count = 0
@@ -471,3 +492,6 @@ def fill_voxel_boundary_boxes(in_file : str, out_file : str, padding : int):
             i.append((0,0))
             iter += 1
         writer.writerow(i)
+
+
+

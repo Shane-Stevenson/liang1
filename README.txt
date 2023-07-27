@@ -1,3 +1,10 @@
-Repository for tree segmentation via LiDAR data. The code in this repository is not fully documented and probably difficult to read :/
+This GitHub repository contains tools to handle Las Files, Point clouds, Voxel grids, as well as several custom AI models.
+As discussed in our paper, custom models should not be persued and because of that the models in this repository are not
+as heavily documented as the tools.
 
-I think requirements.txt is up to date but needs to be tested
+Installation:
+
+    1. git clone https://github.com/Shane-Stevenson/liang1.git
+    2. conda create -n 'replace with desire name' python=3.10
+    3. cd liang1
+    4. pip install -r requirements.txt

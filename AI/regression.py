@@ -8,6 +8,8 @@ import numpy as np
 Final iteration of our regression AI
 """
 
+#Not heavily documented because this mode is very primitive and not too useful
+
 class Net(nn.Module):
     def __init__(self):
         super().__init__()

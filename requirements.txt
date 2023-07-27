@@ -4,5 +4,7 @@ laspy
 matplotlib
 numpy
 fiona
+torch
 torchvision
 sklearn
+pyviz3d
